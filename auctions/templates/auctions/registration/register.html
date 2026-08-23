@@ -1,0 +1,39 @@
+{% extends 'auctions/base.html' %}
+{% block content %}
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow-sm border-0 p-4">
+            <h2 class="mb-4 fw-bold text-center">Регистрация</h2>
+            
+            <form method="POST">
+                {% csrf_token %}
+                
+                <!-- Вывод стандартной формы регистрации Django -->
+                {% for field in form %}
+                    <div class="mb-3">
+                        <label for="{{ field.id_for_label }}" class="form-label fw-bold">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.errors %}
+                            <div class="text-danger small">{{ field.errors }}</div>
+                        {% endif %}
+                        {% if field.help_text %}
+                            <div class="text-muted small">{{ field.help_text }}</div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-warning btn-lg">ЗАРЕГИСТРИРОВАТЬСЯ</button>
+                </div>
+            </form>
+
+            <div class="text-center mt-3 small text-muted">
+                Уже есть аккаунт? <a href="{% url 'login' %}" class="text-decoration-none fw-bold">Войти</a>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+{% endblock %}

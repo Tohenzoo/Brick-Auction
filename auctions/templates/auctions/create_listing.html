@@ -1,0 +1,113 @@
+{% extends 'auctions/base.html' %}
+{% block content %}
+
+<div class="row justify-content-center mb-5">
+    <div class="col-md-8">
+        <div class="card shadow-sm border-0 p-4">
+            <h2 class="mb-4 fw-bold text-center">Выставить новый лот</h2>
+            
+            <form method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                
+                {% for field in form %}
+                    <div class="mb-3">
+                        <label for="{{ field.id_for_label }}" class="form-label fw-bold">{{ field.label }}</label>
+                        {{ field }}
+                    </div>
+                {% endfor %}
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Предпросмотр (двойной клик — сделать обложкой):</label>
+                    <div id="imagePreviewContainer" class="d-flex gap-2 flex-wrap border rounded p-3 bg-light" style="min-height: 100px; align-items: center;">
+                        <span class="text-muted small">Фотографии не выбраны</span>
+                    </div>
+                </div>
+
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-warning btn-lg">ОПУБЛИКОВАТЬ ЛОТ</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    const imageInput = document.getElementById('id_image');
+    const previewContainer = document.getElementById('imagePreviewContainer');
+    let selectedFiles = [];
+
+    imageInput.addEventListener('change', function(event) {
+        selectedFiles = Array.from(event.target.files);
+        updatePreviewAndInput();
+    });
+
+    function updatePreviewAndInput() {
+        previewContainer.innerHTML = '';
+
+        if (selectedFiles.length === 0) {
+            previewContainer.innerHTML = '<span class="text-muted small">Фотографии не выбраны</span>';
+            return;
+        }
+
+        const dataTransfer = new DataTransfer();
+
+        selectedFiles.forEach((file, index) => {
+            dataTransfer.items.add(file);
+
+            const imgWrapper = document.createElement('div');
+            imgWrapper.style.position = 'relative';
+            imgWrapper.style.cursor = 'pointer';
+            imgWrapper.title = 'Двойной клик — сделать обложкой';
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.style.width = '80px';
+                img.style.height = '80px';
+                img.style.objectFit = 'cover';
+                img.className = 'rounded border shadow-sm';
+
+                // Метка обложки
+                if (index === 0) {
+                    const badge = document.createElement('span');
+                    badge.innerText = 'Обложка';
+                    badge.className = 'badge bg-dark position-absolute bottom-0 start-0 m-1';
+                    badge.style.fontSize = '9px';
+                    imgWrapper.appendChild(badge);
+                }
+
+                imgWrapper.appendChild(img);
+            };
+            reader.readAsDataURL(file);
+
+            // Кнопка удаления
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.innerHTML = '&times;';
+            deleteBtn.className = 'btn btn-danger btn-sm position-absolute top-0 end-0 p-0 px-1 m-1';
+            deleteBtn.style.lineHeight = '1';
+            deleteBtn.style.fontSize = '12px';
+            deleteBtn.onclick = function(e) {
+                e.preventDefault();
+                selectedFiles.splice(index, 1);
+                updatePreviewAndInput();
+            };
+            imgWrapper.appendChild(deleteBtn);
+
+            // Смена обложки по двойному клику
+            imgWrapper.ondblclick = function() {
+                if (index === 0) return;
+                const fileToMove = selectedFiles.splice(index, 1)[0];
+                selectedFiles.unshift(fileToMove);
+                updatePreviewAndInput();
+            };
+
+            previewContainer.appendChild(imgWrapper);
+        });
+
+        imageInput.files = dataTransfer.files;
+    }
+</script>
+
+{% endblock %}

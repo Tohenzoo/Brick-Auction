@@ -1,0 +1,218 @@
+{% extends 'auctions/base.html' %}
+{% block content %}
+
+<!-- 1. ПРОМО-БАНЕР С ВАШИМ ФОНОМ И ТЕКСТОМ ПОВЕРХ -->
+<div class="p-5 mb-5 rounded-4 text-white position-relative overflow-hidden shadow-sm" style="background: url('/media/background_logo.jpg') center/cover no-repeat; min-height: 350px; display: flex; align-items: center;">
+    
+    <!-- Затемнение фона для идеальной читаемости текста -->
+    <div class="position-absolute top-0 start-0 w-100 h-100" style="background: linear-gradient(90deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 100%); z-index: 1;"></div>
+    
+    <div class="row w-100 align-items-center position-relative" style="z-index: 2;">
+        <div class="col-md-8 ps-md-4">
+            <h1 class="display-5 fw-bold mb-3" style="letter-spacing: -1px; text-shadow: 0 2px 4px rgba(0,0,0,0.9);">
+                РЕДКИЕ МИНИФИГУРКИ LEGO
+            </h1>
+            <p class="fs-5 mb-4 text-light" style="text-shadow: 0 1px 3px rgba(0,0,0,0.9);">
+                Лучшие лоты со всего мира <br>Делайте ставки и пополняйте свою коллекцию!
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- 2. СЕРИИ -->
+<div class="mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold m-0">Серии</h3>
+        {% if selected_category %}
+            <a href="{% url 'index' %}" class="small text-decoration-none text-danger fw-semibold">Сбросить фильтр</a>
+        {% endif %}
+    </div>
+    
+    <div class="d-flex gap-4 overflow-auto pb-2" style="scrollbar-width: none;">
+        {% for cat in categories %}
+            <a href="{% url 'category_view' cat.id %}" class="text-decoration-none text-dark text-center" style="min-width: 100px;">
+                <div class="card border-0 shadow-sm rounded-4 mx-auto mb-2 d-flex align-items-center justify-content-center bg-light overflow-hidden {% if selected_category == cat.id %}border border-dark border-2{% endif %}" style="width: 85px; height: 85px; transition: transform 0.2s;">
+                    <span class="fw-bold fs-3 text-secondary">{{ cat.name|slice:":1"|upper }}</span>
+                </div>
+                <span class="small fw-semibold d-block text-truncate px-1">{{ cat.name }}</span>
+            </a>
+        {% empty %}
+            <p class="text-muted">Серий пока нет.</p>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- 3. ГОРЯЧИЕ ТОРГИ И СОРТИРОВКА -->
+<div class="mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold m-0">ГОРЯЧИЕ ТОРГИ</h3>
+        
+        <!-- Форма сортировки -->
+        <form method="GET" action="" class="d-flex align-items-center">
+            <span class="text-muted small me-2">Сортировать:</span>
+            <select name="sort" class="form-select form-select-sm rounded-pill border-0 bg-light px-3" onchange="this.form.submit()" style="width: 200px;">
+                <option value="default" {% if not current_sort %}selected{% endif %}>По умолчанию</option>
+                <option value="newest" {% if current_sort == 'newest' %}selected{% endif %}>Сначала новые</option>
+                <option value="price_low" {% if current_sort == 'price_low' %}selected{% endif %}>Цена: по возрастанию</option>
+                <option value="price_high" {% if current_sort == 'price_high' %}selected{% endif %}>Цена: по убыванию</option>
+            </select>
+            {% if selected_category %}
+                <input type="hidden" name="category" value="{{ selected_category }}">
+            {% endif %}
+        </form>
+    </div>
+    
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-md-4 g-4">
+        {% for listing in listings %}
+            <div class="col">
+                <!-- Карточка с эффектом подъема при наведении -->
+                <div class="card h-100 shadow-sm border-0 rounded-4 p-3 position-relative" style="transition: transform 0.3s ease, box-shadow 0.3s ease;" onmouseover="this.style.transform='translateY(-5px)'; this.style.boxShadow='0 .5rem 1rem rgba(0,0,0,.15)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 .125rem .25rem rgba(0,0,0,.075)'">
+                    
+                    <!-- Кнопка избранного (сердечко) в правом верхнем углу -->
+                    {% if user.is_authenticated %}
+                        <a href="{% url 'toggle_watchlist' listing.id %}" class="watchlist-btn position-absolute top-0 end-0 m-3 text-decoration-none z-3 fs-5 {% if request.user in listing.watchlist.all %}text-danger{% else %}text-muted{% endif %}" title="{% if request.user in listing.watchlist.all %}Убрать из избранного{% else %}В избранное{% endif %}" style="transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'" data-in-watchlist="{% if request.user in listing.watchlist.all %}true{% else %}false{% endif %}">
+                            {% if request.user in listing.watchlist.all %}
+                                <i class="bi bi-heart-fill"></i>
+                            {% else %}
+                                <i class="bi bi-heart"></i>
+                            {% endif %}
+                        </a>
+                    {% endif %}
+
+                    <!-- Картинка целиком (без обрезки) с эффектом увеличения (Zoom) -->
+                    <a href="{% url 'listing_detail' listing.id %}" class="bg-light rounded-3 mb-3 d-flex align-items-center justify-content-center overflow-hidden position-relative" style="height: 180px;">
+                        {% if listing.image %}
+                            <img src="{{ listing.image.url }}" class="w-100 h-100" alt="{{ listing.title }}" style="object-fit: contain; transition: transform 0.5s ease;" onmouseover="this.style.transform='scale(1.12)'" onmouseout="this.style.transform='scale(1)'">
+                        {% else %}
+                            <div class="text-muted">Нет фото</div>
+                        {% endif %}
+                    </a>
+                    
+                    <div class="card-body p-0 d-flex flex-column">
+                        <!-- Название -->
+                        <a href="{% url 'listing_detail' listing.id %}" class="text-decoration-none text-dark fw-bold mb-1" style="font-size: 15px; line-height: 1.2;">
+                            {{ listing.title }}
+                        </a>
+                        
+                        <!-- Серия -->
+                        <p class="text-muted small mb-1">Серия: {{ listing.category.name }}</p>
+                        
+                        <!-- Артикул серым цветом -->
+                        {% if listing.article %}
+                            <p class="text-muted small mb-2">Артикул: <span class="fw-semibold text-dark">{{ listing.article }}</span></p>
+                        {% endif %}
+                        
+                        <!-- Цена и таймер -->
+                        <div class="d-flex justify-content-between align-items-end mt-auto mb-3">
+                            <div>
+                                <span class="text-muted small d-block" style="font-size: 11px;">Текущая ставка:</span>
+                                <div class="fs-5 fw-bold text-dark">{% if listing.current_bid > 0 %}{{ listing.current_bid }}{% else %}{{ listing.starting_bid }}{% endif %} ₽</div>
+                            </div>
+                            <div class="text-end text-danger small fw-bold timer" data-end="{{ listing.end_date|date:'c' }}" style="display: none;">
+                                <div><i class="bi bi-hourglass-split"></i> <span class="time-left">00:00:00</span></div>
+                            </div>
+                        </div>
+
+                        <!-- Кнопка -->
+                        <a href="{% url 'listing_detail' listing.id %}" class="btn btn-warning fw-bold w-100 py-2 rounded-3 text-dark shadow-sm" style="background-color: #ffcc00; border: none; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#e6b800'" onmouseout="this.style.backgroundColor='#ffcc00'">
+                            СДЕЛАТЬ СТАВКУ
+                        </a>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col-12">
+                <p class="text-muted">Активных торгов пока нет.</p>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Скрипты: Бесшовное избранное + Таймер -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const watchlistButtons = document.querySelectorAll('.watchlist-btn');
+        
+        watchlistButtons.forEach(button => {
+            const icon = button.querySelector('i');
+            
+            // Наведение мыши: если НЕ в избранном, полностью закрашиваем сердечко красным
+            button.addEventListener('mouseenter', function() {
+                if (this.getAttribute('data-in-watchlist') !== 'true') {
+                    icon.classList.remove('bi-heart', 'text-muted');
+                    icon.classList.add('bi-heart-fill', 'text-danger');
+                }
+            });
+            
+            // Уход мыши: если НЕ в избранном, возвращаем пустой серый контур
+            button.addEventListener('mouseleave', function() {
+                if (this.getAttribute('data-in-watchlist') !== 'true') {
+                    icon.classList.remove('bi-heart-fill', 'text-danger');
+                    icon.classList.add('bi-heart', 'text-muted');
+                }
+            });
+
+            // Клик (бесшовный AJAX-запрос)
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                const url = this.getAttribute('href');
+                
+                fetch(url, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.added) {
+                        this.setAttribute('data-in-watchlist', 'true');
+                        icon.classList.remove('bi-heart', 'text-muted');
+                        icon.classList.add('bi-heart-fill', 'text-danger');
+                        this.setAttribute('title', 'Убрать из избранного');
+                    } else {
+                        this.setAttribute('data-in-watchlist', 'false');
+                        icon.classList.remove('bi-heart-fill', 'text-danger');
+                        icon.classList.add('bi-heart', 'text-muted');
+                        this.setAttribute('title', 'В избранное');
+                    }
+                })
+                .catch(error => console.error('Ошибка:', error));
+            });
+        });
+    });
+
+    // Скрипт таймера
+    function updateTimers() {
+        const timers = document.querySelectorAll('.timer');
+        timers.forEach(timer => {
+            const endDateString = timer.getAttribute('data-end');
+            const endTime = new Date(endDateString).getTime();
+            const now = new Date().getTime();
+            const distance = endTime - now;
+            const oneDayMs = 24 * 60 * 60 * 1000;
+
+            if (distance > oneDayMs) {
+                timer.style.display = 'none';
+                return;
+            } else {
+                timer.style.display = 'block';
+            }
+
+            const timeLeftSpan = timer.querySelector('.time-left');
+            if (distance < 0) {
+                timeLeftSpan.innerHTML = "Торги завершены";
+                return;
+            }
+
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+            timeLeftSpan.innerHTML = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        });
+    }
+    updateTimers();
+    setInterval(updateTimers, 1000);
+</script>
+
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends 'auctions/base.html' %}
+{% block content %}
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow-sm border-0 p-4">
+            <h2 class="mb-4 fw-bold text-center">Вход</h2>
+            
+            {% if form.errors %}
+                <div class="alert alert-danger small py-2">
+                    Неверное имя пользователя или пароль.
+                </div>
+            {% endif %}
+
+            <form method="POST" action="{% url 'login' %}">
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label for="id_username" class="form-label fw-bold">Имя пользователя</label>
+                    <input type="text" name="username" class="form-control" required id="id_username" placeholder="Введите имя">
+                </div>
+
+                <div class="mb-3">
+                    <label for="id_password" class="form-label fw-bold">Пароль</label>
+                    <input type="password" name="password" class="form-control" required id="id_password" placeholder="Введите пароль">
+                </div>
+
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-warning btn-lg">ВОЙТИ</button>
+                </div>
+            </form>
+
+            <div class="text-center mt-3 small text-muted">
+                Еще нет аккаунта? <a href="{% url 'register' %}" class="text-decoration-none fw-bold">Зарегистрироваться</a>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+{% endblock %}
