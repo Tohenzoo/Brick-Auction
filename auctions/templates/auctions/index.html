@@ -29,20 +29,26 @@
     </div>
     
     <div class="d-flex gap-4 overflow-auto pb-2" style="scrollbar-width: none;">
-        {% for cat in categories %}
-            <a href="{% url 'category_view' cat.id %}" class="text-decoration-none text-dark text-center" style="min-width: 100px;">
+        {% for cat in display_categories %}
+            <a href="{% url 'index' %}?category={{ cat.id }}" class="text-decoration-none text-dark text-center" style="min-width: 100px;">
                 <div class="card border-0 shadow-sm rounded-4 mx-auto mb-2 d-flex align-items-center justify-content-center bg-light overflow-hidden {% if selected_category == cat.id %}border border-dark border-2{% endif %}" style="width: 85px; height: 85px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                     {% if cat.image %}
-                        <img src="{{ cat.image.url }}" alt="{{ cat.name }}" class="w-100 h-100" style="object-fit: cover;">
+                        <img src="{{ cat.image.url }}" alt="{{ cat.display_name }}" class="w-100 h-100" style="object-fit: cover;">
                     {% else %}
-                        <span class="fw-bold fs-3 text-secondary">{{ cat.name|slice:":1"|upper }}</span>
+                        <span class="fw-bold fs-3 text-secondary">{{ cat.display_name|slice:":1"|upper }}</span>
                     {% endif %}
                 </div>
-                <span class="small fw-semibold d-block text-truncate px-1" style="max-width: 100px;">{{ cat.name }}</span>
+                <span class="small fw-semibold d-block text-truncate px-1" style="max-width: 100px;">{{ cat.display_name }}</span>
             </a>
-        {% empty %}
-            <p class="text-muted">Серий пока нет.</p>
         {% endfor %}
+        
+        <!-- Кнопка "Разное" -->
+        <a href="{% url 'index' %}?category=other" class="text-decoration-none text-dark text-center" style="min-width: 100px;">
+            <div class="card border-0 shadow-sm rounded-4 mx-auto mb-2 d-flex align-items-center justify-content-center bg-light overflow-hidden {% if selected_category == 'other' %}border border-dark border-2{% endif %}" style="width: 85px; height: 85px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                <img src="/media/category_logos/atr_logo.png" alt="Разное" class="w-100 h-100" style="object-fit: cover;">
+            </div>
+            <span class="small fw-semibold d-block text-truncate px-1" style="max-width: 100px;">Разное</span>
+        </a>
     </div>
 </div>
 
@@ -110,9 +116,9 @@
                         <div class="d-flex justify-content-between align-items-end mt-auto mb-3">
                             <div>
                                 <span class="text-muted small d-block" style="font-size: 11px;">Текущая ставка:</span>
-                                <div class="fs-5 fw-bold text-dark">{% if listing.current_bid > 0 %}{{ listing.current_bid }}{% else %}{{ listing.starting_bid }}{% endif %} ₽</div>
+                                <div class="fs-5 fw-bold text-dark">{% if listing.current_price > 0 %}{{ listing.current_price }}{% else %}{{ listing.starting_bid }}{% endif %} ₽</div>
                             </div>
-                            <div class="text-end text-danger small fw-bold timer" data-end="{{ listing.end_date|date:'c' }}" style="display: none;">
+                            <div class="text-end text-danger small fw-bold timer" data-end="{{ listing.ends_at|date:'c' }}" style="display: none;">
                                 <div><i class="bi bi-hourglass-split"></i> <span class="time-left">00:00:00</span></div>
                             </div>
                         </div>

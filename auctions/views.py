@@ -1,6 +1,7 @@
 import json
 import urllib.request
 import urllib.error
+import re
 from datetime import timedelta
 from decimal import Decimal
 
@@ -12,26 +13,8 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.db.models import Q
 
-from .models import Listing, Bid, Category, Minifigure
+from .models import Listing, Bid, Category, Minifigure, Watchlist
 
-# API-ключ Rebrickable на случай, если фигурки нет в локальной базе
-REBRICKABLE_API_KEY = ""
-
-
-import json
-import urllib.request
-from django.http import JsonResponse
-from auctions.models import Minifigure, Category
-
-import urllib.request
-import re
-from django.http import JsonResponse
-from auctions.models import Minifigure, Category
-
-import urllib.request
-import re
-from django.http import JsonResponse
-from auctions.models import Minifigure, Category
 
 def lookup_minifig(request):
     """Поиск фигурки с получением реального имени на английском языке."""
@@ -39,7 +22,6 @@ def lookup_minifig(request):
     if not raw_query:
         return JsonResponse({"found": False})
 
-    # Генерируем все возможные варианты написания артикула (sw0061, sw061, sw61)
     variants = [raw_query]
     m = re.match(r'^([a-z]+)0*(\d+)([a-z]*)$', raw_query)
     if m:
@@ -82,7 +64,7 @@ def lookup_minifig(request):
     cat_name = cat_map.get(prefix_str, "")
     cat_obj = Category.objects.filter(name__icontains=cat_name).first() if cat_name else None
 
-    # 3. Запрос точного имени с Brickset (перебираем sw0061 и sw061)
+    # 3. Запрос точного имени с Brickset
     real_name = ""
     img_url = f"https://img.bricklink.com/ItemImage/MN/0/{raw_query}.png"
 
@@ -98,7 +80,6 @@ def lookup_minifig(request):
             with urllib.request.urlopen(req, timeout=3) as resp:
                 html = resp.read().decode('utf-8', errors='ignore')
 
-                # Вариант 1: парсим <title>sw061: Super Battle Droid | Brickset</title>
                 title_match = re.search(r'<title>[^:]+:\s*([^|<]+)\s*\|', html, re.IGNORECASE)
                 if title_match:
                     name_candidate = title_match.group(1).strip()
@@ -106,7 +87,6 @@ def lookup_minifig(request):
                         real_name = name_candidate
                         break
 
-                # Вариант 2: парсим og:title
                 og_match = re.search(r'property="og:title"\s+content="[^:]+:\s*([^"]+)"', html, re.IGNORECASE)
                 if og_match:
                     real_name = og_match.group(1).strip()
@@ -117,7 +97,6 @@ def lookup_minifig(request):
     if not real_name:
         return JsonResponse({"found": False})
 
-    # Сохраняем в локальную БД для быстрого доступа
     for code_var in variants:
         Minifigure.objects.update_or_create(
             fig_num=code_var,
@@ -137,21 +116,47 @@ def lookup_minifig(request):
         "image_url": img_url,
     })
 
+
 def index(request):
-    """Главная страница со списком только активных лотов."""
+    """Главная страница со списком активных лотов и кастомной сортировкой серий."""
     category_id = request.GET.get("category")
     sort = request.GET.get("sort")
     search_query = request.GET.get("q", "").strip()
     now = timezone.now()
 
-    # Фильтруем активные лоты, время которых еще не истекло
     listings = Listing.objects.filter(is_active=True).filter(
-        Q(end_date__isnull=True) | Q(end_date__gt=now)
+        Q(ends_at__isnull=True) | Q(ends_at__gt=now)
     )
 
-    if category_id:
-        listings = listings.filter(category_id=category_id)
+    # 1. Задаем нужный порядок и названия
+    all_categories = list(Category.objects.all())
+    target_names = ['Star Wars', 'Ninjago', 'Super Heroes', 'LoTR', 'Harry Potter', 'CMF']
+    
+    display_categories = []
+    main_cat_ids = []
 
+    for name in target_names:
+        # Ищем категорию (учитываем, что LoTR в БД может называться Lord of the Rings)
+        cat = next((c for c in all_categories if c.name.lower() == name.lower() or (name == 'LoTR' and c.name.lower() == 'lord of the rings')), None)
+        if cat:
+            cat.display_name = name  # Принудительно ставим короткое имя для шаблона
+            display_categories.append(cat)
+            main_cat_ids.append(cat.id)
+
+    # 2. Обработка фильтрации (включая "Разное")
+    if category_id == "other":
+        listings = listings.exclude(category_id__in=main_cat_ids)
+        selected_category = "other"
+    elif category_id:
+        try:
+            listings = listings.filter(category_id=int(category_id))
+            selected_category = int(category_id)
+        except ValueError:
+            selected_category = None
+    else:
+        selected_category = None
+
+    # 3. Поиск и сортировка
     if search_query:
         listings = listings.filter(
             Q(title__icontains=search_query) | Q(description__icontains=search_query)
@@ -160,21 +165,19 @@ def index(request):
     if sort == "newest":
         listings = listings.order_by("-id")
     elif sort == "price_low":
-        listings = listings.order_by("current_bid")
+        listings = listings.order_by("current_price")
     elif sort == "price_high":
-        listings = listings.order_by("-current_bid")
+        listings = listings.order_by("-current_price")
     else:
         listings = listings.order_by("-created_at")
 
-    categories = Category.objects.all()
     return render(request, "auctions/index.html", {
         "listings": listings,
-        "categories": categories,
-        "selected_category": int(category_id) if category_id else None,
+        "display_categories": display_categories,
+        "selected_category": selected_category,
         "current_sort": sort,
         "search_query": search_query,
     })
-
 
 def category_view(request, category_id):
     """Просмотр лотов конкретной категории."""
@@ -182,7 +185,7 @@ def category_view(request, category_id):
     now = timezone.now()
 
     listings = Listing.objects.filter(category=category, is_active=True).filter(
-        Q(end_date__isnull=True) | Q(end_date__gt=now)
+        Q(ends_at__isnull=True) | Q(ends_at__gt=now)
     ).order_by("-created_at")
 
     categories = Category.objects.all()
@@ -200,7 +203,7 @@ def listing_detail(request, listing_id):
 
     is_in_watchlist = False
     if request.user.is_authenticated:
-        is_in_watchlist = request.user in listing.watchlist.all()
+        is_in_watchlist = Watchlist.objects.filter(user=request.user, listing=listing).exists()
 
     return render(request, "auctions/listing.html", {
         "listing": listing,
@@ -211,12 +214,11 @@ def listing_detail(request, listing_id):
 
 @login_required
 def add_bid(request, listing_id):
-    """Прием ставки с защитой от завершенных лотов и ставок от автора."""
+    """Прием ставки."""
     listing = get_object_or_404(Listing, id=listing_id)
     now = timezone.now()
 
-    # Запрещаем ставки, если лот завершен или ставка идет от автора лота
-    if not listing.is_active or (listing.end_date and listing.end_date <= now) or request.user == listing.owner:
+    if not listing.is_active or (listing.ends_at and listing.ends_at <= now) or request.user == listing.owner:
         return redirect("listing_detail", listing_id=listing.id)
 
     if request.method == "POST":
@@ -225,11 +227,11 @@ def add_bid(request, listing_id):
         except (ValueError, TypeError):
             bid_amount = Decimal("0")
 
-        current_highest = listing.current_bid if listing.current_bid > 0 else listing.starting_bid
+        current_highest = listing.current_price if listing.current_price > 0 else listing.starting_bid
 
         if bid_amount > current_highest:
             Bid.objects.create(user=request.user, listing=listing, amount=bid_amount)
-            listing.current_bid = bid_amount
+            listing.current_price = bid_amount
             listing.save()
 
     return redirect("listing_detail", listing_id=listing.id)
@@ -239,17 +241,21 @@ def add_bid(request, listing_id):
 def toggle_watchlist(request, listing_id):
     """Добавление/удаление лота из избранного."""
     listing = get_object_or_404(Listing, id=listing_id)
-    if request.user in listing.watchlist.all():
-        listing.watchlist.remove(request.user)
+    watchlist_item = Watchlist.objects.filter(user=request.user, listing=listing).first()
+    
+    if watchlist_item:
+        watchlist_item.delete()
     else:
-        listing.watchlist.add(request.user)
+        Watchlist.objects.create(user=request.user, listing=listing)
+        
     return redirect("listing_detail", listing_id=listing.id)
 
 
 @login_required
 def watchlist_view(request):
     """Список избранных лотов пользователя."""
-    listings = request.user.watchlist.all()
+    watched_items = Watchlist.objects.filter(user=request.user).select_related("listing")
+    listings = [item.listing for item in watched_items]
     return render(request, "auctions/watchlist.html", {"listings": listings})
 
 
@@ -260,11 +266,12 @@ def my_bids(request):
     listing_ids = user_bids.values_list("listing_id", flat=True).distinct()
     all_bids_listings = Listing.objects.filter(id__in=listing_ids).order_by("-created_at")
 
+    now = timezone.now()
     active_listings = []
     past_listings = []
 
     for listing in all_bids_listings:
-        if listing.is_finished:
+        if not listing.is_active or (listing.ends_at and listing.ends_at <= now):
             past_listings.append(listing)
         else:
             active_listings.append(listing)
@@ -284,7 +291,7 @@ def my_listings(request):
 
 @login_required
 def create_listing(request):
-    """Создание лота с привязкой артикула, расчетом даты окончания и выбором обложки."""
+    """Создание лота."""
     if request.method == "POST":
         title = request.POST.get("title", "").strip()
         description = request.POST.get("description", "").strip()
@@ -295,29 +302,23 @@ def create_listing(request):
             starting_bid = Decimal("0")
 
         category_id = request.POST.get("category")
-        fig_code = request.POST.get("fig_code", "").strip()
         duration_days = int(request.POST.get("duration_days", 3))
-        cover_index = int(request.POST.get("cover_index", 0))
-
         category = get_object_or_404(Category, id=category_id) if category_id else None
-        minifig = Minifigure.objects.filter(fig_num__iexact=fig_code).first() if fig_code else None
-        end_date = timezone.now() + timedelta(days=duration_days)
 
         listing = Listing(
             title=title,
             description=description,
             starting_bid=starting_bid,
-            current_bid=starting_bid,
+            current_price=starting_bid,
             category=category,
-            minifigure=minifig,
             owner=request.user,
-            end_date=end_date,
+            duration_days=duration_days,
             is_active=True,
         )
 
         uploaded_files = request.FILES.getlist("images")
         if uploaded_files:
-            listing.image = uploaded_files[cover_index] if cover_index < len(uploaded_files) else uploaded_files[0]
+            listing.image = uploaded_files[0]
 
         listing.save()
         return redirect("index")

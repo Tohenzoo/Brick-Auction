@@ -1,158 +1,121 @@
-{% extends "auctions/base.html" %}
+{% extends "auctions/layout.html" %}
 
-{% block content %}
+{% block body %}
 <div class="container py-4">
-    <!-- Хлебные крошки -->
-    <nav aria-label="breadcrumb" class="mb-4">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'index' %}" class="text-decoration-none text-muted">Главная</a></li>
-            {% if listing.category %}
-                <li class="breadcrumb-item"><a href="{% url 'category_view' listing.category.id %}" class="text-decoration-none text-muted">{{ listing.category.name }}</a></li>
-            {% endif %}
-            <li class="breadcrumb-item active text-dark" aria-current="page">{{ listing.title }}</li>
-        </ol>
-    </nav>
 
-    <div class="row g-5">
-        <!-- Левая колонка: Изображение лота -->
-<div class="col-lg-6">
-    <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-light d-flex align-items-center justify-content-center p-4" style="min-height: 420px;">
-        {% if listing.image %}
-            <img src="{{ listing.image.url }}" alt="{{ listing.title }}" class="img-fluid rounded-3" style="max-height: 380px; object-fit: contain;">
-        {% elif listing.image_url %}
-            <img src="{{ listing.image_url }}" alt="{{ listing.title }}" class="img-fluid rounded-3" style="max-height: 380px; object-fit: contain;">
-        {% else %}
-            <div class="text-secondary text-center py-5">
-                <i class="bi bi-image fs-1 d-block mb-2"></i>
-                <span>Изображение отсутствует</span>
-            </div>
-        {% endif %}
-    </div>
-</div>
+    <!-- Секция серий / категорий -->
+    <div class="mb-5">
+        <h4 class="fw-bold mb-3">Серии LEGO</h4>
+        <div class="d-flex flex-wrap gap-3 align-items-center">
+            <a href="{% url 'index' %}" class="btn {% if not selected_category %}btn-dark{% else %}btn-outline-dark{% endif %} rounded-pill px-3 py-2 d-flex align-items-center gap-2">
+                <span>Все серии</span>
+            </a>
 
-        <!-- Правая колонка: Информация о торгах и действия -->
-        <div class="col-lg-6">
-            <h2 class="fw-bold mb-1">{{ listing.title }}</h2>
-           <p class="text-muted small mb-4">
-    Продавец: <span class="fw-semibold text-dark">{{ listing.owner.username }}</span>
-</p>
-
-            <div class="bg-white p-4 rounded-4 shadow-sm border mb-4">
-                <div class="d-flex justify-content-between align-items-baseline mb-3">
-                    <span class="text-muted">Текущая цена:</span>
-                    <div class="text-end">
-                        <span class="fs-3 fw-bold text-dark">{{ listing.current_bid }} ₽</span>
-                        <span class="badge bg-secondary ms-2 align-middle">{{ bids.count }} ставок</span>
-                    </div>
-                </div>
-
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <span class="text-muted">До конца торгов:</span>
-                    {% if listing.is_finished %}
-                        <span class="badge bg-danger px-3 py-2">Торги завершены</span>
+            {% for cat in categories %}
+                <a href="{% url 'category_listings' cat.id %}" 
+                   class="btn {% if selected_category.id == cat.id %}btn-primary{% else %}btn-light border{% endif %} rounded-pill px-3 py-2 d-flex align-items-center gap-2 shadow-sm text-decoration-none">
+                    {% if cat.image %}
+                        <img src="{{ cat.image.url }}" alt="{{ cat.name }}" class="rounded-circle" style="width: 26px; height: 26px; object-fit: cover;">
                     {% else %}
-                        <span class="text-danger fw-bold">
-                            <i class="bi bi-hourglass-split"></i> {{ listing.end_date|timeuntil }}
+                        <span class="badge bg-secondary rounded-circle" style="width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem;">
+                            {{ cat.name|slice:":2" }}
                         </span>
                     {% endif %}
-                </div>
+                    <span class="fw-semibold text-dark">{{ cat.name }}</span>
+                </a>
+            {% endfor %}
+        </div>
+    </div>
 
-                <!-- Блок ставок -->
-                {% if listing.is_finished %}
-                    <div class="alert alert-secondary text-center fw-semibold mb-3 py-3 rounded-3">
-                        Аукцион по этому лоту завершен
-                    </div>
-                {% elif user.is_authenticated %}
-                    {% if user == listing.user %}
-                        <div class="alert alert-info text-center small mb-3 rounded-3">
-                            Вы являетесь автором этого лота.
-                        </div>
-                    {% else %}
-                        <form action="{% url 'add_bid' listing.id %}" method="POST" class="mb-3">
-                            {% csrf_token %}
-                            <div class="mb-3">
-                                <label class="form-label small text-muted">Ваша ставка (мин. шаг: 1 ₽):</label>
-                                <input type="number" step="1" min="{{ listing.current_bid|add:1 }}" name="bid_amount" class="form-control form-control-lg text-center fw-bold" placeholder="Сумма ставки" required>
-                            </div>
-                            <button type="submit" class="btn btn-warning w-100 py-2 fw-bold text-dark shadow-sm">
-                                СДЕЛАТЬ СТАВКУ
-                            </button>
-                        </form>
-                    {% endif %}
+    <!-- Заголовок активных лотов -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-0">
+                {% if selected_category %}
+                    Аукционы: {{ selected_category.name }}
                 {% else %}
-                    <div class="alert alert-light border text-center mb-3">
-                        <a href="{% url 'login' %}" class="fw-bold text-decoration-none">Войдите</a>, чтобы сделать ставку.
-                    </div>
+                    Активные аукционы
                 {% endif %}
-
-                <!-- Кнопка Избранного (только для активных торгов) -->
-{% if user.is_authenticated and not listing.is_finished %}
-    <form action="{% url 'toggle_watchlist' listing.id %}" method="POST">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-outline-secondary w-100 py-2">
-            {% if is_in_watchlist %}
-                <i class="bi bi-heart-fill text-danger me-1"></i> В избранном
-            {% else %}
-                <i class="bi bi-heart me-1"></i> Добавить в избранное
-            {% endif %}
-        </button>
-    </form>
-{% endif %}
-            </div>
+            </h2>
+            <p class="text-muted mb-0">Найдено лотов: {{ listings|length }}</p>
         </div>
+        {% if user.is_authenticated %}
+            <a href="{% url 'create_listing' %}" class="btn btn-warning fw-semibold shadow-sm">
+                + Создать лот
+            </a>
+        {% endif %}
     </div>
 
-    <!-- Вкладки с описанием и историей -->
-    <div class="mt-5">
-        <ul class="nav nav-tabs border-bottom" id="listingTab" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active fw-semibold text-dark" id="description-tab" data-bs-toggle="tab" data-bs-target="#description" type="button" role="tab">ОПИСАНИЕ</button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link fw-semibold text-dark" id="bids-tab" data-bs-toggle="tab" data-bs-target="#bids" type="button" role="tab">ИСТОРИЯ СТАВОК ({{ bids.count }})</button>
-            </li>
-        </ul>
+    <!-- Сетка карточек лотов -->
+    {% if listings %}
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
+            {% for item in listings %}
+                <div class="col">
+                    <div class="card h-100 shadow-sm border-0 rounded-3 overflow-hidden position-relative">
+                        
+                        <!-- Категория бейдж -->
+                        <span class="position-absolute top-0 start-0 m-2 badge bg-dark bg-opacity-75 text-white">
+                            {{ item.category.name }}
+                        </span>
 
-        <div class="tab-content pt-4" id="listingTabContent">
-            <!-- Вкладка Описание -->
-            <div class="tab-pane fade show active" id="description" role="tabpanel">
-                <div class="card border-0 bg-light p-4 rounded-4">
-                    <h5 class="fw-bold mb-3">Описание</h5>
-                    <p class="mb-0 text-secondary" style="white-space: pre-line;">{{ listing.description|default:"Продавец не добавил описание к лоту." }}</p>
-                </div>
-            </div>
-
-            <!-- Вкладка История ставок -->
-            <div class="tab-pane fade" id="bids" role="tabpanel">
-                <div class="card border-0 bg-light p-4 rounded-4">
-                    <h5 class="fw-bold mb-3">История ставок</h5>
-                    {% if bids %}
-                        <div class="table-responsive">
-                            <table class="table table-borderless align-middle mb-0">
-                                <thead>
-                                    <tr class="text-muted border-bottom">
-                                        <th>Участник</th>
-                                        <th>Ставка</th>
-                                        <th>Время</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for bid in bids %}
-                                        <tr>
-                                            <td class="fw-semibold">{{ bid.user.username }}</td>
-                                            <td class="fw-bold text-dark">{{ bid.amount }} ₽</td>
-                                            <td class="text-muted small">{{ bid.timestamp|date:"d.m.Y H:i" }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                        <!-- Изображение лота -->
+                        <div class="bg-light d-flex align-items-center justify-content-center" style="height: 220px; overflow: hidden;">
+                            {% if item.image %}
+                                <img src="{{ item.image.url }}" class="card-img-top w-100 h-100" style="object-fit: cover;" alt="{{ item.title }}">
+                            {% elif item.image_url %}
+                                <img src="{{ item.image_url }}" class="card-img-top w-100 h-100" style="object-fit: contain; padding: 10px;" alt="{{ item.title }}">
+                            {% else %}
+                                <div class="text-muted text-center p-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" class="bi bi-image text-secondary mb-2" viewBox="0 0 16 16">
+                                        <path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0"/>
+                                        <path d="M2.002 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm12 1a1 1 0 0 1 1 1v6.5l-3.777-1.947a.5.5 0 0 0-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 0-.63.062L1.002 12V3a1 1 0 0 1 1-1z"/>
+                                    </svg>
+                                    <div>Нет фото</div>
+                                </div>
+                            {% endif %}
                         </div>
-                    {% else %}
-                        <p class="text-muted mb-0">Ставок пока не было. Будьте первым!</p>
-                    {% endif %}
+
+                        <!-- Контент карточки -->
+                        <div class="card-body d-flex flex-column p-3">
+                            <h5 class="card-title text-truncate mb-2" title="{{ item.title }}">
+                                <a href="{% url 'listing' item.id %}" class="text-dark text-decoration-none stretched-link">
+                                    {{ item.title }}
+                                </a>
+                            </h5>
+
+                            {% if item.description %}
+                                <p class="card-text text-muted small text-truncate mb-3">
+                                    {{ item.description }}
+                                </p>
+                            {% endif %}
+
+                            <div class="mt-auto pt-2 border-top">
+                                <div class="d-flex justify-content-between align-items-baseline mb-1">
+                                    <span class="text-muted small">Текущая ставка:</span>
+                                    <span class="fs-5 fw-bold text-success">{{ item.current_price }} ₽</span>
+                                </div>
+
+                                {% if item.ends_at %}
+                                    <div class="d-flex justify-content-between align-items-center text-muted small">
+                                        <span>До окончания:</span>
+                                        <span class="badge bg-light text-dark border">{{ item.ends_at|timeuntil }}</span>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                    </div>
                 </div>
-            </div>
+            {% endfor %}
         </div>
-    </div>
+    {% else %}
+        <div class="text-center py-5 bg-light rounded-3 border">
+            <p class="lead text-muted mb-3">В этой категории пока нет активных лотов.</p>
+            {% if user.is_authenticated %}
+                <a href="{% url 'create_listing' %}" class="btn btn-warning">Создать первый лот</a>
+            {% endif %}
+        </div>
+    {% endif %}
+
 </div>
 {% endblock %}
