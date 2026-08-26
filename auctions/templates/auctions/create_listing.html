@@ -1,113 +1,291 @@
-{% extends 'auctions/base.html' %}
+{% extends "auctions/base.html" %}
+
 {% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm rounded-4 p-4 p-md-5">
+                <h3 class="fw-bold text-center mb-4">Выставить новый лот</h3>
 
-<div class="row justify-content-center mb-5">
-    <div class="col-md-8">
-        <div class="card shadow-sm border-0 p-4">
-            <h2 class="mb-4 fw-bold text-center">Выставить новый лот</h2>
-            
-            <form method="POST" enctype="multipart/form-data">
-                {% csrf_token %}
-                
-                {% for field in form %}
+                <form method="POST" action="{% url 'create_listing' %}" enctype="multipart/form-data" id="auctionForm">
+                    {% csrf_token %}
+
+                    <!-- 1. Поле ввода артикула -->
                     <div class="mb-3">
-                        <label for="{{ field.id_for_label }}" class="form-label fw-bold">{{ field.label }}</label>
-                        {{ field }}
+                        <label for="fig_code" class="form-label fw-semibold">Артикул фигурки (LEGO ID)</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control form-control-lg rounded-start-3" id="fig_code" name="fig_code" placeholder="например: sw0004, sh0012, njo001" autocomplete="off" required>
+                            <button class="btn btn-dark px-4 fw-semibold rounded-end-3" type="button" id="lookupBtn">
+                                <span id="lookupBtnText">Найти</span>
+                                <span id="lookupSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+                            </button>
+                        </div>
+                        <div id="lookupStatus" class="form-text mt-1" style="min-height: 20px;"></div>
                     </div>
-                {% endfor %}
 
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Предпросмотр (двойной клик — сделать обложкой):</label>
-                    <div id="imagePreviewContainer" class="d-flex gap-2 flex-wrap border rounded p-3 bg-light" style="min-height: 100px; align-items: center;">
-                        <span class="text-muted small">Фотографии не выбраны</span>
+                    <!-- 2. Автозаполняемое поле названия -->
+                    <div class="mb-3">
+                        <label for="title" class="form-label fw-semibold">Название лота</label>
+                        <input type="text" class="form-control form-control-lg rounded-3" id="title" name="title" placeholder="Заполнится автоматически после ввода артикула" required>
                     </div>
-                </div>
 
-                <div class="d-grid mt-4">
-                    <button type="submit" class="btn btn-warning btn-lg">ОПУБЛИКОВАТЬ ЛОТ</button>
-                </div>
-            </form>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label for="category" class="form-label fw-semibold">Серия</label>
+                            <select class="form-select form-select-lg rounded-3" id="category" name="category" required>
+                                <option value="" selected disabled>Выберите серию...</option>
+                                {% for cat in categories %}
+                                    <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="starting_bid" class="form-label fw-semibold">Стартовая цена (₽)</label>
+                            <input type="number" step="1" min="1" class="form-control form-control-lg rounded-3" id="starting_bid" name="starting_bid" placeholder="100" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="duration_days" class="form-label fw-semibold">Длительность торгов (дней)</label>
+                        <select class="form-select form-select-lg rounded-3" id="duration_days" name="duration_days">
+                            <option value="1">1 день</option>
+                            <option value="3" selected>3 дня</option>
+                            <option value="5">5 дней</option>
+                            <option value="7">7 дней</option>
+                            <option value="14">14 дней</option>
+                        </select>
+                    </div>
+
+                    <!-- 3. Мультизагрузка фото с выбором обложки -->
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold d-flex justify-content-between align-items-center">
+                            <span>Фотографии лота</span>
+                            <small class="text-muted fw-normal">Кликните по фото, чтобы сделать его главной обложкой</small>
+                        </label>
+                        
+                        <input type="file" class="form-control form-control-lg rounded-3 mb-3" id="imagesInput" name="images" accept="image/*" multiple>
+                        <input type="hidden" name="cover_index" id="coverIndex" value="0">
+
+                        <div id="previewContainer" class="p-3 border border-2 border-dashed rounded-4 bg-light min-vh-20">
+                            <div id="emptyPlaceholder" class="text-center text-muted py-4">
+                                <i class="bi bi-images fs-1 d-block mb-1"></i>
+                                <span>Фотографии не выбраны</span>
+                            </div>
+                            <div id="thumbnailsGrid" class="row g-3 d-none"></div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="description" class="form-label fw-semibold">Описание лота</label>
+                        <textarea class="form-control rounded-3" id="description" name="description" rows="4" placeholder="Опишите состояние фигурки, наличие трещин, аксессуары и комплектацию..."></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-warning w-100 py-3 fw-bold text-dark rounded-3 shadow-sm fs-5">
+                        ОПУБЛИКОВАТЬ ЛОТ
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 </div>
 
+<style>
+.preview-card {
+    position: relative;
+    cursor: pointer;
+    border-radius: 14px;
+    background-color: #ffffff;
+    border: 2px solid #e9ecef;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    overflow: hidden;
+    transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.preview-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+.preview-card.is-cover {
+    border: 2.5px solid #ffc107 !important;
+    background-color: #fffdf5;
+}
+.preview-card img {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    display: block;
+}
+.cover-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 6px;
+    z-index: 2;
+}
+.remove-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(33, 37, 41, 0.65);
+    color: #ffffff;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 2;
+    transition: background-color 0.2s ease;
+}
+.remove-btn:hover {
+    background: rgba(220, 53, 69, 0.95);
+}
+</style>
+
 <script>
-    const imageInput = document.getElementById('id_image');
-    const previewContainer = document.getElementById('imagePreviewContainer');
-    let selectedFiles = [];
+// Автопоиск артикула
+const figCodeInput = document.getElementById('fig_code');
+const titleInput = document.getElementById('title');
+const categorySelect = document.getElementById('category');
+const lookupBtn = document.getElementById('lookupBtn');
+const lookupStatus = document.getElementById('lookupStatus');
+const lookupBtnText = document.getElementById('lookupBtnText');
+const lookupSpinner = document.getElementById('lookupSpinner');
 
-    imageInput.addEventListener('change', function(event) {
-        selectedFiles = Array.from(event.target.files);
-        updatePreviewAndInput();
-    });
+let debounceTimer;
 
-    function updatePreviewAndInput() {
-        previewContainer.innerHTML = '';
+async function checkMinifigCode() {
+    const code = figCodeInput.value.trim();
+    if (!code || code.length < 3) return;
 
-        if (selectedFiles.length === 0) {
-            previewContainer.innerHTML = '<span class="text-muted small">Фотографии не выбраны</span>';
-            return;
+    lookupBtnText.classList.add('d-none');
+    lookupSpinner.classList.remove('d-none');
+    lookupStatus.innerHTML = '';
+
+    try {
+        const response = await fetch(`{% url 'lookup_minifig' %}?code=${encodeURIComponent(code)}`);
+        const data = await response.json();
+
+        if (data.found) {
+            titleInput.value = data.title;
+            if (data.category_id) {
+                categorySelect.value = data.category_id;
+            }
+            lookupStatus.innerHTML = '<span class="text-success fw-semibold"><i class="bi bi-check-circle-fill"></i> Найдено: ' + data.title + '</span>';
+        } else {
+            lookupStatus.innerHTML = '<span class="text-muted"><i class="bi bi-info-circle"></i> Артикул не найден в каталоге. Можно ввести название вручную.</span>';
+        }
+    } catch (error) {
+        lookupStatus.innerHTML = '<span class="text-danger">Ошибка при поиске артикула.</span>';
+    } finally {
+        lookupBtnText.classList.remove('d-none');
+        lookupSpinner.classList.add('d-none');
+    }
+}
+
+// Поиск по нажатию кнопки или Enter
+lookupBtn.addEventListener('click', checkMinifigCode);
+figCodeInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        checkMinifigCode();
+    }
+});
+
+// Автопоиск при паузе в наборе текста (debouncing)
+figCodeInput.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(checkMinifigCode, 600);
+});
+
+// Превью изображений
+const imagesInput = document.getElementById('imagesInput');
+const thumbnailsGrid = document.getElementById('thumbnailsGrid');
+const emptyPlaceholder = document.getElementById('emptyPlaceholder');
+const coverIndexInput = document.getElementById('coverIndex');
+let filesList = [];
+
+imagesInput.addEventListener('change', (e) => {
+    filesList = Array.from(e.target.files);
+    renderPreviews();
+});
+
+function renderPreviews() {
+    thumbnailsGrid.innerHTML = '';
+    
+    if (filesList.length === 0) {
+        emptyPlaceholder.classList.remove('d-none');
+        thumbnailsGrid.classList.add('d-none');
+        coverIndexInput.value = 0;
+        return;
+    }
+
+    emptyPlaceholder.classList.add('d-none');
+    thumbnailsGrid.classList.remove('d-none');
+
+    let currentCover = parseInt(coverIndexInput.value);
+    if (currentCover >= filesList.length) currentCover = 0;
+    coverIndexInput.value = currentCover;
+
+    filesList.forEach((file, index) => {
+        const col = document.createElement('div');
+        col.className = 'col-4 col-md-3';
+
+        const card = document.createElement('div');
+        card.className = `preview-card shadow-sm ${index === currentCover ? 'is-cover' : ''}`;
+        card.onclick = () => selectCover(index);
+
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+
+        if (index === currentCover) {
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-warning text-dark cover-badge shadow-sm';
+            badge.innerText = 'Обложка';
+            card.appendChild(badge);
         }
 
-        const dataTransfer = new DataTransfer();
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'remove-btn';
+        removeBtn.innerHTML = '&times;';
+        removeBtn.onclick = (e) => {
+            e.stopPropagation();
+            removeImage(index);
+        };
 
-        selectedFiles.forEach((file, index) => {
-            dataTransfer.items.add(file);
+        card.appendChild(img);
+        card.appendChild(removeBtn);
+        col.appendChild(card);
+        thumbnailsGrid.appendChild(col);
+    });
+}
 
-            const imgWrapper = document.createElement('div');
-            imgWrapper.style.position = 'relative';
-            imgWrapper.style.cursor = 'pointer';
-            imgWrapper.title = 'Двойной клик — сделать обложкой';
+function selectCover(index) {
+    coverIndexInput.value = index;
+    renderPreviews();
+}
 
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const img = document.createElement('img');
-                img.src = e.target.result;
-                img.style.width = '80px';
-                img.style.height = '80px';
-                img.style.objectFit = 'cover';
-                img.className = 'rounded border shadow-sm';
-
-                // Метка обложки
-                if (index === 0) {
-                    const badge = document.createElement('span');
-                    badge.innerText = 'Обложка';
-                    badge.className = 'badge bg-dark position-absolute bottom-0 start-0 m-1';
-                    badge.style.fontSize = '9px';
-                    imgWrapper.appendChild(badge);
-                }
-
-                imgWrapper.appendChild(img);
-            };
-            reader.readAsDataURL(file);
-
-            // Кнопка удаления
-            const deleteBtn = document.createElement('button');
-            deleteBtn.type = 'button';
-            deleteBtn.innerHTML = '&times;';
-            deleteBtn.className = 'btn btn-danger btn-sm position-absolute top-0 end-0 p-0 px-1 m-1';
-            deleteBtn.style.lineHeight = '1';
-            deleteBtn.style.fontSize = '12px';
-            deleteBtn.onclick = function(e) {
-                e.preventDefault();
-                selectedFiles.splice(index, 1);
-                updatePreviewAndInput();
-            };
-            imgWrapper.appendChild(deleteBtn);
-
-            // Смена обложки по двойному клику
-            imgWrapper.ondblclick = function() {
-                if (index === 0) return;
-                const fileToMove = selectedFiles.splice(index, 1)[0];
-                selectedFiles.unshift(fileToMove);
-                updatePreviewAndInput();
-            };
-
-            previewContainer.appendChild(imgWrapper);
-        });
-
-        imageInput.files = dataTransfer.files;
-    }
+function removeImage(index) {
+    filesList.splice(index, 1);
+    const dataTransfer = new DataTransfer();
+    filesList.forEach(file => dataTransfer.items.add(file));
+    imagesInput.files = dataTransfer.files;
+    renderPreviews();
+}
 </script>
-
 {% endblock %}

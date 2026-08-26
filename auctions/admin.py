@@ -1,16 +1,21 @@
 from django.contrib import admin
-from .models import Category, Listing, Bid, ListingImage
+from .models import Category, Listing, Bid, Minifigure
 
-# Создаем инлайн-класс для дополнительных фото
-class ListingImageInline(admin.TabularInline):
-    model = ListingImage
-    extra = 3  # Количество пустых строк для загрузки по умолчанию
-    max_num = 10  # Максимальное количество фото
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ("id", "name")
 
-# Регистрируем модель Listing с использованием этого инлайна
+@admin.register(Minifigure)
+class MinifigureAdmin(admin.ModelAdmin):
+    list_display = ("fig_num", "name", "category")
+    search_fields = ("fig_num", "name")
+    list_filter = ("category",)
+
+@admin.register(Listing)
 class ListingAdmin(admin.ModelAdmin):
-    inlines = [ListingImageInline]
+    list_display = ("title", "current_bid", "is_active", "end_date")
+    search_fields = ("title",)
 
-admin.site.register(Category)
-admin.site.register(Listing, ListingAdmin)
-admin.site.register(Bid)
+@admin.register(Bid)
+class BidAdmin(admin.ModelAdmin):
+    list_display = ("user", "listing", "amount", "timestamp")

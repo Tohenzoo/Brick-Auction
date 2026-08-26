@@ -1,217 +1,158 @@
-{% extends 'auctions/base.html' %}
-{% block content %}
+{% extends "auctions/base.html" %}
 
+{% block content %}
 <div class="container py-4">
     <!-- Хлебные крошки -->
-    <nav aria-label="breadcrumb" class="mb-3">
+    <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="{% url 'index' %}" class="text-decoration-none text-muted">Главная</a></li>
-            <li class="breadcrumb-item"><a href="#" class="text-decoration-none text-muted">{{ listing.category.name }}</a></li>
-            <li class="breadcrumb-item active">{{ listing.title }}</li>
+            {% if listing.category %}
+                <li class="breadcrumb-item"><a href="{% url 'category_view' listing.category.id %}" class="text-decoration-none text-muted">{{ listing.category.name }}</a></li>
+            {% endif %}
+            <li class="breadcrumb-item active text-dark" aria-current="page">{{ listing.title }}</li>
         </ol>
     </nav>
 
-    <div class="row">
-        <!-- ЛЕВАЯ КОЛОНКА: Фото и галерея -->
-        <div class="col-lg-7">
-            <div class="card border-0 mb-3 shadow-sm rounded-4 overflow-hidden bg-light d-flex align-items-center justify-content-center" style="min-height: 350px;">
-                {% if listing.image %}
-                    <img src="{{ listing.image.url }}" class="img-fluid w-100" alt="{{ listing.title }}" style="max-height: 450px; object-fit: contain; cursor: pointer;" id="mainImage" data-bs-toggle="modal" data-bs-target="#imageModal">
-                {% else %}
-                    <div class="text-muted py-5">Нет фото</div>
-                {% endif %}
+    <div class="row g-5">
+        <!-- Левая колонка: Изображение лота -->
+<div class="col-lg-6">
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-light d-flex align-items-center justify-content-center p-4" style="min-height: 420px;">
+        {% if listing.image %}
+            <img src="{{ listing.image.url }}" alt="{{ listing.title }}" class="img-fluid rounded-3" style="max-height: 380px; object-fit: contain;">
+        {% elif listing.image_url %}
+            <img src="{{ listing.image_url }}" alt="{{ listing.title }}" class="img-fluid rounded-3" style="max-height: 380px; object-fit: contain;">
+        {% else %}
+            <div class="text-secondary text-center py-5">
+                <i class="bi bi-image fs-1 d-block mb-2"></i>
+                <span>Изображение отсутствует</span>
             </div>
-            
-            <!-- Галерея дополнительных фото (миниатюры снизу) -->
-            <div class="d-flex gap-2 overflow-auto pb-2">
-                {% if listing.image %}
-                    <img src="{{ listing.image.url }}" class="rounded-3 border shadow-sm" style="width: 80px; height: 80px; object-fit: cover; cursor: pointer;" onclick="changeMainImage('{{ listing.image.url }}', 0)">
-                {% endif %}
-                {% for img in listing.images.all %}
-                    <img src="{{ img.image.url }}" class="rounded-3 border shadow-sm" style="width: 80px; height: 80px; object-fit: cover; cursor: pointer;" onclick="changeMainImage('{{ img.image.url }}', {{ forloop.counter }})">
-                {% endfor %}
-            </div>
-        </div>
+        {% endif %}
+    </div>
+</div>
 
-        <!-- ПРАВАЯ КОЛОНКА: Интерфейс ставок -->
-        <div class="col-lg-5">
+        <!-- Правая колонка: Информация о торгах и действия -->
+        <div class="col-lg-6">
             <h2 class="fw-bold mb-1">{{ listing.title }}</h2>
-            
-            <!-- Артикул серым цветом под названием -->
-            {% if listing.article %}
-                <p class="text-muted small mb-2">Артикул: <span class="fw-semibold text-dark">{{ listing.article }}</span></p>
-            {% endif %}
-            
-            <p class="text-muted mb-3">Продавец: <span class="fw-semibold text-dark">{{ listing.owner.username }}</span></p>
-            
-            <div class="card border-0 shadow-sm rounded-4 p-4 bg-light">
-                <div class="d-flex justify-content-between align-items-center mb-3">
+           <p class="text-muted small mb-4">
+    Продавец: <span class="fw-semibold text-dark">{{ listing.owner.username }}</span>
+</p>
+
+            <div class="bg-white p-4 rounded-4 shadow-sm border mb-4">
+                <div class="d-flex justify-content-between align-items-baseline mb-3">
                     <span class="text-muted">Текущая цена:</span>
-                    <div>
-                        <span class="fs-3 fw-bold text-dark">{% if listing.current_bid > 0 %}{{ listing.current_bid }}{% else %}{{ listing.starting_bid }}{% endif %} ₽</span>
-                        <span class="ms-2 badge bg-secondary">{{ listing.bids.count }} ставок</span>
+                    <div class="text-end">
+                        <span class="fs-3 fw-bold text-dark">{{ listing.current_bid }} ₽</span>
+                        <span class="badge bg-secondary ms-2 align-middle">{{ bids.count }} ставок</span>
                     </div>
                 </div>
 
-                <div class="d-flex justify-content-between align-items-center mb-4 text-danger small fw-bold">
-                    <span>До конца торгов:</span>
-                    <span><i class="bi bi-hourglass-split"></i> Торги активны</span>
-                </div>
-                
-                <!-- Форма ставки -->
-                <form action="{% url 'add_bid' listing.id %}" method="POST" class="mb-3">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label class="form-label text-muted small">Минимальная ставка:</label>
-                        <input type="number" name="bid_amount" class="form-control form-control-lg rounded-3" placeholder="Сумма ставки" required>
-                    </div>
-                    <button type="submit" class="btn btn-warning w-100 py-3 fw-bold rounded-3 shadow-sm text-dark" style="background-color: #ffcc00; border: none;">
-                        СДЕЛАТЬ СТАВКУ
-                    </button>
-                    {% if user.is_authenticated %}
-                        <a href="{% url 'toggle_watchlist' listing.id %}" class="btn btn-outline-secondary w-100 py-2 rounded-3 mt-2 fw-semibold d-flex align-items-center justify-content-center gap-2">
-                    {% if request.user in listing.watchlist.all %}
-                        <i class="bi bi-heart-fill text-danger"></i> В избранном
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <span class="text-muted">До конца торгов:</span>
+                    {% if listing.is_finished %}
+                        <span class="badge bg-danger px-3 py-2">Торги завершены</span>
                     {% else %}
-                        <i class="bi bi-heart"></i> Добавить в избранное
+                        <span class="text-danger fw-bold">
+                            <i class="bi bi-hourglass-split"></i> {{ listing.end_date|timeuntil }}
+                        </span>
                     {% endif %}
-                        </a>
-                    {% endif %}
-                </form>
-                
-                <hr class="text-muted opacity-25 my-3">
-
-                <div class="d-flex justify-content-between align-items-center">
-                    <span class="text-muted small">Купить сейчас:</span>
-                    <span class="fw-bold fs-5">{% widthratio listing.starting_bid 1 2 %} ₽</span>
                 </div>
-                <button class="btn btn-outline-dark w-100 py-2 rounded-3 mt-2 fw-semibold">
-                    Купить
-                </button>
+
+                <!-- Блок ставок -->
+                {% if listing.is_finished %}
+                    <div class="alert alert-secondary text-center fw-semibold mb-3 py-3 rounded-3">
+                        Аукцион по этому лоту завершен
+                    </div>
+                {% elif user.is_authenticated %}
+                    {% if user == listing.user %}
+                        <div class="alert alert-info text-center small mb-3 rounded-3">
+                            Вы являетесь автором этого лота.
+                        </div>
+                    {% else %}
+                        <form action="{% url 'add_bid' listing.id %}" method="POST" class="mb-3">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label class="form-label small text-muted">Ваша ставка (мин. шаг: 1 ₽):</label>
+                                <input type="number" step="1" min="{{ listing.current_bid|add:1 }}" name="bid_amount" class="form-control form-control-lg text-center fw-bold" placeholder="Сумма ставки" required>
+                            </div>
+                            <button type="submit" class="btn btn-warning w-100 py-2 fw-bold text-dark shadow-sm">
+                                СДЕЛАТЬ СТАВКУ
+                            </button>
+                        </form>
+                    {% endif %}
+                {% else %}
+                    <div class="alert alert-light border text-center mb-3">
+                        <a href="{% url 'login' %}" class="fw-bold text-decoration-none">Войдите</a>, чтобы сделать ставку.
+                    </div>
+                {% endif %}
+
+                <!-- Кнопка Избранного (только для активных торгов) -->
+{% if user.is_authenticated and not listing.is_finished %}
+    <form action="{% url 'toggle_watchlist' listing.id %}" method="POST">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-secondary w-100 py-2">
+            {% if is_in_watchlist %}
+                <i class="bi bi-heart-fill text-danger me-1"></i> В избранном
+            {% else %}
+                <i class="bi bi-heart me-1"></i> Добавить в избранное
+            {% endif %}
+        </button>
+    </form>
+{% endif %}
             </div>
         </div>
     </div>
 
-    <!-- ВКЛАДКИ: Описание, Характеристики, История ставок -->
+    <!-- Вкладки с описанием и историей -->
     <div class="mt-5">
-        <ul class="nav nav-tabs border-bottom" id="listingTabs" role="tablist">
+        <ul class="nav nav-tabs border-bottom" id="listingTab" role="tablist">
             <li class="nav-item" role="presentation">
-                <button class="nav-link active text-dark fw-bold border-0 bg-transparent py-3" id="desc-tab" data-bs-toggle="tab" data-bs-target="#desc" type="button" role="tab">ОПИСАНИЕ</button>
+                <button class="nav-link active fw-semibold text-dark" id="description-tab" data-bs-toggle="tab" data-bs-target="#description" type="button" role="tab">ОПИСАНИЕ</button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link text-muted fw-bold border-0 bg-transparent py-3" id="chars-tab" data-bs-toggle="tab" data-bs-target="#chars" type="button" role="tab">ХАРАКТЕРИСТИКИ</button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link text-muted fw-bold border-0 bg-transparent py-3" id="bids-tab" data-bs-toggle="tab" data-bs-target="#bids" type="button" role="tab">ИСТОРИЯ СТАВОК ({{ listing.bids.count }})</button>
+                <button class="nav-link fw-semibold text-dark" id="bids-tab" data-bs-toggle="tab" data-bs-target="#bids" type="button" role="tab">ИСТОРИЯ СТАВОК ({{ bids.count }})</button>
             </li>
         </ul>
-        
-        <div class="tab-content p-4 bg-light rounded-bottom-4 shadow-sm" id="listingTabsContent">
-            <!-- Описание -->
-            <div class="tab-pane fade show active" id="desc" role="tabpanel">
-                <h5 class="fw-bold mb-3">Описание</h5>
-                <p class="text-secondary" style="white-space: pre-line;">{{ listing.description }}</p>
-            </div>
-            
-            <!-- Характеристики -->
-            <div class="tab-pane fade" id="chars" role="tabpanel">
-                <h5 class="fw-bold mb-3">Характеристики</h5>
-                <table class="table table-borderless bg-transparent">
-                    <tr><td class="text-muted" width="200">Серия:</td><td class="fw-semibold">{{ listing.category.name }}</td></tr>
-                    <tr><td class="text-muted">Артикул:</td><td class="fw-semibold">{{ listing.article|default:"—" }}</td></tr>
-                    <tr><td class="text-muted">Состояние:</td><td class="fw-semibold">Новое</td></tr>
-                    <tr><td class="text-muted">Дата создания:</td><td class="fw-semibold">{{ listing.created_at|date:"d.m.Y H:i" }}</td></tr>
-                </table>
+
+        <div class="tab-content pt-4" id="listingTabContent">
+            <!-- Вкладка Описание -->
+            <div class="tab-pane fade show active" id="description" role="tabpanel">
+                <div class="card border-0 bg-light p-4 rounded-4">
+                    <h5 class="fw-bold mb-3">Описание</h5>
+                    <p class="mb-0 text-secondary" style="white-space: pre-line;">{{ listing.description|default:"Продавец не добавил описание к лоту." }}</p>
+                </div>
             </div>
 
-            <!-- История ставок -->
+            <!-- Вкладка История ставок -->
             <div class="tab-pane fade" id="bids" role="tabpanel">
-                <h5 class="fw-bold mb-3">История ставок</h5>
-                <div class="table-responsive">
-                    <table class="table table-hover bg-white rounded-3 overflow-hidden">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Время</th>
-                                <th>Пользователь</th>
-                                <th>Ставка</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for bid in listing.bids.all %}
-                                <tr>
-                                    <td>{{ bid.timestamp|date:"H:i" }}</td>
-                                    <td>{{ bid.user.username }}</td>
-                                    <td class="fw-bold">{{ bid.amount }} ₽</td>
-                                </tr>
-                            {% empty %}
-                                <tr>
-                                    <td colspan="3" class="text-muted text-center py-3">Ставок пока нет. Будьте первыми!</td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <div class="card border-0 bg-light p-4 rounded-4">
+                    <h5 class="fw-bold mb-3">История ставок</h5>
+                    {% if bids %}
+                        <div class="table-responsive">
+                            <table class="table table-borderless align-middle mb-0">
+                                <thead>
+                                    <tr class="text-muted border-bottom">
+                                        <th>Участник</th>
+                                        <th>Ставка</th>
+                                        <th>Время</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for bid in bids %}
+                                        <tr>
+                                            <td class="fw-semibold">{{ bid.user.username }}</td>
+                                            <td class="fw-bold text-dark">{{ bid.amount }} ₽</td>
+                                            <td class="text-muted small">{{ bid.timestamp|date:"d.m.Y H:i" }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted mb-0">Ставок пока не было. Будьте первым!</p>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
-
-<!-- Модальное окно для увеличенного просмотра фото -->
-<div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content bg-dark border-0">
-            <div class="modal-body text-center position-relative p-0 d-flex align-items-center justify-content-center" style="height: 80vh;">
-                <!-- Кнопка закрытия -->
-                <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Закрыть" style="z-index: 10;"></button>
-                
-                <!-- Стрелка Назад -->
-                <button type="button" class="btn btn-dark position-absolute start-0 ms-3 rounded-circle text-white px-3 py-2 opacity-75" onclick="prevImage()" style="z-index: 5;">❮</button>
-                
-                <!-- Картинка в модалке -->
-                <img id="modalImage" src="" class="img-fluid" style="max-height: 100%; max-width: 100%; object-fit: contain;">
-                
-                <!-- Стрелка Вперед -->
-                <button type="button" class="btn btn-dark position-absolute end-0 me-3 rounded-circle text-white px-3 py-2 opacity-75" onclick="nextImage()" style="z-index: 5;">❯</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Скрипт галереи и модального окна -->
-<script>
-    const images = [
-        {% if listing.image %}"{{ listing.image.url }}"{% endif %}
-        {% for img in listing.images.all %}, "{{ img.image.url }}"{% endfor %}
-    ];
-
-    let currentIndex = 0;
-
-    function changeMainImage(src, index) {
-        document.getElementById('mainImage').src = src;
-        currentIndex = index;
-    }
-
-    const imageModal = document.getElementById('imageModal');
-    imageModal.addEventListener('show.bs.modal', function () {
-        const mainSrc = document.getElementById('mainImage').src;
-        document.getElementById('modalImage').src = mainSrc;
-        currentIndex = images.indexOf(new URL(mainSrc, window.location.origin).pathname);
-        if (currentIndex === -1) currentIndex = 0;
-    });
-
-    function prevImage() {
-        if (images.length === 0) return;
-        currentIndex = (currentIndex - 1 + images.length) % images.length;
-        document.getElementById('modalImage').src = images[currentIndex];
-        document.getElementById('mainImage').src = images[currentIndex];
-    }
-
-    function nextImage() {
-        if (images.length === 0) return;
-        currentIndex = (currentIndex + 1) % images.length;
-        document.getElementById('modalImage').src = images[currentIndex];
-        document.getElementById('mainImage').src = images[currentIndex];
-    }
-</script>
-
 {% endblock %}
